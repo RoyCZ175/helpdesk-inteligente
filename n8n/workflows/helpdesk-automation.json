@@ -1,0 +1,171 @@
+{
+  "name": "Helpdesk Automation",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "note-overview",
+      "name": "Cómo configurar esto",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-360, -260],
+      "notesInFlow": false,
+      "content": "## Helpdesk Automation\n\n1. Reemplaza `REPLACE_WITH_YOUR_SECRET` en el nodo **Validar secreto** por el mismo valor que pusiste en `N8N_WEBHOOK_SECRET` (Vercel).\n2. Configura credenciales en **Enviar email** (SMTP/Gmail/Resend) y **Crear tarjeta en Trello**.\n3. Pega tu Slack/Discord Incoming Webhook URL en **Notificar Slack/Discord**.\n4. Activa el workflow (toggle arriba a la derecha).\n5. Copia la URL del nodo **Webhook** (modo Production) a `N8N_WEBHOOK_URL` en Vercel."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "helpdesk",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-160, 0],
+      "webhookId": "helpdesk-automation"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "secret-check",
+              "leftValue": "={{$json.headers[\"x-helpdesk-secret\"]}}",
+              "rightValue": "REPLACE_WITH_YOUR_SECRET",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-secret",
+      "name": "Validar secreto",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [80, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"unauthorized\" } }}",
+        "options": { "responseCode": 401 }
+      },
+      "id": "respond-unauthorized",
+      "name": "Rechazar (401)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [320, 200]
+    },
+    {
+      "parameters": {
+        "fromEmail": "helpdesk@tuempresa.com",
+        "toEmail": "={{$json.body.email}}",
+        "subject": "={{ $json.body.event === \"ticket.resolved_by_ai\" ? \"Tu ticket fue resuelto: \" + $json.body.title : \"Recibimos tu ticket: \" + $json.body.title }}",
+        "emailFormat": "text",
+        "text": "={{ $json.body.aiAnswer ? (\"Hola,\\n\\nTu ticket \\\"\" + $json.body.title + \"\\\" se resolvió automáticamente:\\n\\n\" + $json.body.aiAnswer + \"\\n\\nSi esto no resuelve tu problema, responde este correo y un agente lo revisará.\\n\\nVer ticket: \" + $json.body.ticketUrl) : (\"Hola,\\n\\nRecibimos tu ticket \\\"\" + $json.body.title + \"\\\".\\nPrioridad asignada por IA: \" + ($json.body.ai ? $json.body.ai.priority : $json.body.userPriority) + \"\\n\\nVer ticket: \" + $json.body.ticketUrl) }}",
+        "options": {}
+      },
+      "id": "email-send",
+      "name": "Enviar email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [320, -60],
+      "credentials": { "smtp": { "id": "REPLACE_ME", "name": "SMTP account" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "escalar-check",
+              "leftValue": "={{$json.body.ai ? $json.body.ai.escalar : false}}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-escalar",
+      "name": "¿Escalar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [560, -60]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"ok\": true } }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "respond-ok",
+      "name": "Responder OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1040, -60]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REPLACE/WITH/YOUR_WEBHOOK",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"text\": \":rotating_light: Ticket urgente: *\" + $json.body.title + \"* (\" + ($json.body.ai ? $json.body.ai.priority : $json.body.userPriority) + \") — \" + $json.body.ticketUrl } }}",
+        "options": {}
+      },
+      "id": "http-slack",
+      "name": "Notificar Slack/Discord",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, -180]
+    },
+    {
+      "parameters": {
+        "resource": "card",
+        "operation": "create",
+        "listId": "REPLACE_WITH_YOUR_TRELLO_LIST_ID",
+        "name": "={{ \"[\" + ($json.body.ai ? $json.body.ai.priority.toUpperCase() : \"URGENTE\") + \"] \" + $json.body.title }}",
+        "description": "={{ ($json.body.ai ? $json.body.ai.resumen : \"\") + \"\\n\\nEmail: \" + $json.body.email + \"\\nVer ticket: \" + $json.body.ticketUrl }}",
+        "additionalFields": {}
+      },
+      "id": "trello-create-card",
+      "name": "Crear tarjeta en Trello",
+      "type": "n8n-nodes-base.trello",
+      "typeVersion": 1,
+      "position": [800, 60],
+      "credentials": { "trelloApi": { "id": "REPLACE_ME", "name": "Trello account" } }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Validar secreto", "type": "main", "index": 0 }]]
+    },
+    "Validar secreto": {
+      "main": [
+        [{ "node": "Enviar email", "type": "main", "index": 0 }],
+        [{ "node": "Rechazar (401)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Enviar email": {
+      "main": [[{ "node": "¿Escalar?", "type": "main", "index": 0 }]]
+    },
+    "¿Escalar?": {
+      "main": [
+        [
+          { "node": "Notificar Slack/Discord", "type": "main", "index": 0 },
+          { "node": "Crear tarjeta en Trello", "type": "main", "index": 0 },
+          { "node": "Responder OK", "type": "main", "index": 0 }
+        ],
+        [{ "node": "Responder OK", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}
