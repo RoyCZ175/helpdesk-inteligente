@@ -9,6 +9,10 @@ export const authConfig = {
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   providers: [],
+  // Auth.js solo confía en el host de la petición automáticamente en Vercel.
+  // En otras plataformas (Render, Railway, etc.) hay que confirmarlo a mano,
+  // si no todas las peticiones fallan con "UntrustedHost".
+  trustHost: true,
   callbacks: {
     jwt({ token, user }) {
       if (user) {
