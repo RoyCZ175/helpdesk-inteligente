@@ -3,6 +3,7 @@ import { getCollection, COLLECTIONS } from "@/lib/db";
 import type { TicketDoc, TicketStatus } from "@/lib/models/types";
 import { serializeTicket } from "@/lib/serialize";
 import { TicketCard } from "@/components/TicketCard";
+import { DeleteTicketButton } from "@/components/DeleteTicketButton";
 import { CardHeader } from "@/components/ui/Card";
 import { cn } from "@/lib/utils";
 
@@ -52,11 +53,18 @@ export default async function AgentPage({
         })}
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {serialized.length === 0 ? (
           <p className="text-sm text-zinc-500">No hay tickets en esta vista.</p>
         ) : (
-          serialized.map((t) => <TicketCard key={t.id} ticket={t} href={`/tickets/${t.id}`} />)
+          serialized.map((t) => (
+            <div key={t.id} className="space-y-2">
+              <TicketCard ticket={t} href={`/tickets/${t.id}`} />
+              <div className="flex justify-end">
+                <DeleteTicketButton ticketId={t.id} />
+              </div>
+            </div>
+          ))
         )}
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
 import { getCollection, COLLECTIONS } from "@/lib/db";
-import { answerFromArticle, classifyTicket, embedText } from "@/lib/gemini";
+import { classifyTicket, embedText } from "@/lib/gemini";
 import {
   DUPLICATE_SIMILARITY_THRESHOLD,
   KB_MATCH_SIMILARITY_THRESHOLD,
@@ -44,22 +44,17 @@ export async function createTicket(input: CreateTicketArgs) {
   };
 
   if (canAutoResolve && kbMatch) {
-    const [aiAnswer, ai] = await Promise.all([
-      answerFromArticle({
-        question: `${input.title}\n${input.description}`,
-        articleTitle: kbMatch.title,
-        articleContent: kbMatch.content,
-      }),
-      classifyTicket({
-        title: input.title,
-        description: input.description,
-        userPriority: input.priority,
-      }),
-    ]);
+    const ai = await classifyTicket({
+      title: input.title,
+      description: input.description,
+      userPriority: input.priority,
+    });
+
+    const shouldEscalate = ai.escalar || ai.priority === "critica";
 
     base.status = "resolved_by_ai";
-    base.ai = { ...ai, escalar: false };
-    base.aiAnswer = aiAnswer;
+    base.ai = { ...ai, escalar: shouldEscalate };
+    base.aiAnswer = kbMatch.content;
     base.aiAnswerSourceId = new ObjectId(kbMatch.articleId);
     base.resolvedAt = now;
   } else {

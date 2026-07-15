@@ -82,7 +82,7 @@
           "conditions": [
             {
               "id": "escalar-check",
-              "leftValue": "={{$json.body.ai ? $json.body.ai.escalar : false}}",
+              "leftValue": "={{($json.body.ai ? ($json.body.ai.escalar === true || $json.body.ai.priority === 'critica') : false)}}",
               "rightValue": true,
               "operator": { "type": "boolean", "operation": "equals" }
             }

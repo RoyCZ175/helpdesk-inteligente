@@ -89,3 +89,27 @@ export async function PATCH(
     return handleApiError(error);
   }
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    await requireRole(["agent", "admin"]);
+    if (!ObjectId.isValid(id)) {
+      throw new ApiError("Ticket no encontrado", 404);
+    }
+
+    const tickets = await getCollection<TicketDoc>(COLLECTIONS.tickets);
+    const result = await tickets.deleteOne({ _id: new ObjectId(id) });
+
+    if (result.deletedCount === 0) {
+      throw new ApiError("Ticket no encontrado", 404);
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
